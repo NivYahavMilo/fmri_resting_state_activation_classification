@@ -111,32 +111,40 @@ class DataLoader:
 
         return transposed_df
 
-    def export_to_pkl(self, data: dict, **params):
+    @staticmethod
+    def export_to_pkl(data: dict, flow_type: FlowType, **params):
         """
         Export the data dictionary to a pickle file.
 
         Args:
             data (dict): Data dictionary to be exported.
+            flow_type: Enum
             params (dict): Preprocess parameters.
-
         Returns:
             None
+
         """
         # Specify the file name with the preprocess properties.
+
         roi: str = params['roi']
         file_name = f'{params["preprocess_type"].value}' \
-                    f'_{params["group_size"]}_subjects_group_size_' \
-                    f'{roi}_roi_' \
-                    f'{str(params["rest_window"])}_rest_window.pkl'
+                    f'_{flow_type.value.lower()}' \
+                    f'_{roi}_roi' \
+                    f'_{str(params["rest_window"])}_rest_window.pkl'
+
+        # Specify the file path where you want to save the report
+        data_dir_path = os.path.join(config.RAW_DATASETS_PATH, roi)
+        if not os.path.exists(data_dir_path):
+            os.makedirs(data_dir_path)
 
         # Specify the file path where you want to save the pickle file
-        file_path = os.path.join(config.RAW_DATASETS_PATH, roi, file_name)
+        file_path = os.path.join(data_dir_path, file_name)
 
         # Open the file in binary mode and save the dictionary as a pickle file
         with open(file_path, 'wb') as file:
             pickle.dump(data, file)
 
-    def preprocess(self, flow_type: FlowType):
+    def preprocess(self, flow_type: FlowType, preprocess_type: PreprocessType):
         """
         Perform the preprocessing steps for all subjects and export the results to a pickle file.
 
@@ -145,14 +153,14 @@ class DataLoader:
         """
         preprocess_data = {}
         preprocess_params = {
-            'roi': 'RH_DorsAttn_Post_2',
+            'roi': 'RH_Default_pCunPCC_1',
             'subject': '',
-            'rest_window': (10, 18),
+            'rest_window': (13, 18),
             'task_window_size': 10,
             'k_subjects': 176,
             'group_size': 35,
             'mode': None,
-            'preprocess_type': PreprocessType.DISTANCES
+            'preprocess_type': preprocess_type
         }
 
         if flow_type == FlowType.SINGLE_SUBJECT:
@@ -160,7 +168,7 @@ class DataLoader:
         elif flow_type == FlowType.GROUP_SUBJECTS:
             preprocess_data = self.group_subjects_flow(**preprocess_params)
 
-        self.export_to_pkl(data=preprocess_data, **preprocess_params)
+        self.export_to_pkl(preprocess_data, flow_type, **preprocess_params)
 
     def group_subjects_flow(self, **preprocess_params):
         preprocess_data = {}
@@ -172,7 +180,7 @@ class DataLoader:
         preprocess_type: PreprocessType = preprocess_params.pop('preprocess_type')
         n_groups: int = preprocess_params.pop('n_groups', 6)
 
-        for group_i in range(1, n_groups+1):
+        for group_i in range(1, n_groups + 1):
             # Rest flow
             preprocess_params['mode'] = Mode.REST
             preprocess_params['group_i'] = group_i
@@ -208,15 +216,14 @@ class DataLoader:
         """
 
         preprocess_params.pop('group_size')
+        preprocess_params.pop('k_subjects')
+        rest_window: Tuple = preprocess_params.pop('rest_window')
+        task_window: int = preprocess_params.pop('task_window_size')
+        preprocess_type: PreprocessType = preprocess_params.pop('preprocess_type')
         preprocess_data = {}
         subjects = os.listdir(config.SUBNET_DATA_DF.format(mode=Mode.TASK.value))
         for subject in subjects:
             preprocess_params['subject'] = subject
-
-            subjects_amount: int = preprocess_params.pop('k_subjects')
-            rest_window: Tuple = preprocess_params.pop('rest_window')
-            task_window: int = preprocess_params.pop('task_window_size')
-            preprocess_type: PreprocessType = preprocess_params.pop('preprocess_type')
 
             # Rest flow
             preprocess_params['mode'] = Mode.REST
@@ -246,4 +253,7 @@ class DataLoader:
 
 if __name__ == '__main__':
     dataloader = DataLoader()
-    dataloader.preprocess(flow_type=FlowType.GROUP_SUBJECTS)
+    dataloader.preprocess(flow_type=FlowType.SINGLE_SUBJECT, preprocess_type=PreprocessType.DISTANCES)
+    dataloader.preprocess(flow_type=FlowType.SINGLE_SUBJECT, preprocess_type=PreprocessType.ACTIVATIONS)
+    dataloader.preprocess(flow_type=FlowType.GROUP_SUBJECTS, preprocess_type=PreprocessType.DISTANCES)
+    dataloader.preprocess(flow_type=FlowType.GROUP_SUBJECTS, preprocess_type=PreprocessType.ACTIVATIONS)
