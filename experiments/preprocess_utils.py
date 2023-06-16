@@ -17,7 +17,9 @@ def _distances_preprocess_util(features):
         precessed_features (pd.Series): The preprocessed features Series.
     """
     # Remove a specific value from the Series
+    # precessed_features = features.apply(lambda feature: 1 - feature)
     precessed_features = features.drop(features[features == 1].index)
+
     return precessed_features
 
 
@@ -72,20 +74,9 @@ def preprocess_dataset(roi: str, dataset: str, mode: Mode, preprocess_type: Prep
         :param roi: roi name
 
     """
-    dataset_dir = os.path.join(config.PREPROCESSED_DATASETS_PATH, roi)
-    if not os.path.exists(dataset_dir):
-        os.makedirs(dataset_dir)
 
-    dataset_path = os.path.join(dataset_dir, dataset)
-
-    if os.path.isfile(dataset_path):
-        preprocess_data = pd.read_pickle(dataset_path)
-    else:
-        raw_dataset_path = os.path.join(config.RAW_DATASETS_PATH, roi, dataset)
-        data = pd.read_pickle(raw_dataset_path)
-        preprocess_data = _preprocess(data, preprocess_type=preprocess_type)
-        preprocess_data_path = os.path.join(dataset_dir, dataset)
-        preprocess_data.to_pickle(preprocess_data_path)
-
+    raw_dataset_path = os.path.join(config.RAW_DATASETS_PATH, roi, dataset)
+    data = pd.read_pickle(raw_dataset_path)
+    preprocess_data = _preprocess(data, preprocess_type=preprocess_type)
     preprocess_data_mode = preprocess_data[preprocess_data['mode'] == mode.value.lower()]
     return preprocess_data_mode

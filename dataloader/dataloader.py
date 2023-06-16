@@ -170,6 +170,7 @@ class DataLoader:
 
         self.export_to_pkl(preprocess_data, flow_type, **preprocess_params)
 
+
     def group_subjects_flow(self, **preprocess_params):
         preprocess_data = {}
 
@@ -203,7 +204,7 @@ class DataLoader:
             )
 
             mean_modes_sequences = {'task': subsequence_mean_task, 'rest': subsequence_mean_rest}
-            preprocess_data[group_i] = mean_modes_sequences
+            preprocess_data[str(group_i)] = mean_modes_sequences
 
         return preprocess_data
 
@@ -253,7 +254,5 @@ class DataLoader:
 
 if __name__ == '__main__':
     dataloader = DataLoader()
-    dataloader.preprocess(flow_type=FlowType.SINGLE_SUBJECT, preprocess_type=PreprocessType.DISTANCES)
-    dataloader.preprocess(flow_type=FlowType.SINGLE_SUBJECT, preprocess_type=PreprocessType.ACTIVATIONS)
-    dataloader.preprocess(flow_type=FlowType.GROUP_SUBJECTS, preprocess_type=PreprocessType.DISTANCES)
     dataloader.preprocess(flow_type=FlowType.GROUP_SUBJECTS, preprocess_type=PreprocessType.ACTIVATIONS)
+    # dataloader.preprocess(flow_type=FlowType.SINGLE_SUBJECT, preprocess_type=PreprocessType.ACTIVATIONS)

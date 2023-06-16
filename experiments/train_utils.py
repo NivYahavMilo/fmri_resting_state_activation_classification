@@ -10,7 +10,8 @@ def get_supervised_tensors(roi: str, mode: Mode, preprocess_type: PreprocessType
         mode=mode,
         preprocess_type=preprocess_type
     )
-    # Remove columns that don't represent movie's features
-    y = dataset['y'].tolist()
-    X = dataset.drop(['subject', 'mode', 'y'], axis=1).values
-    return X, y
+    dataset = dataset.drop(['mode'], axis=1)
+
+    # Rename the column 'subject' to 'group'
+    dataset = dataset.rename(columns={'subject': 'group'})
+    return dataset
