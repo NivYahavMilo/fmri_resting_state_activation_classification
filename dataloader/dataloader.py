@@ -53,7 +53,7 @@ class DataLoader:
         start_time, end_time = rest_window
 
         # Filter the DataFrame based on the time window
-        filtered_df = data[(data['timepoint'] >= start_time) & (data['timepoint'] <= end_time)]
+        filtered_df = data[(data['timepoint'] > start_time) & (data['timepoint'] <= end_time)]
         return filtered_df
 
     def get_task_subsequence(self, data: pd.DataFrame, window_size: int) -> pd.DataFrame:
@@ -254,5 +254,5 @@ class DataLoader:
 
 if __name__ == '__main__':
     dataloader = DataLoader()
-    dataloader.preprocess(flow_type=FlowType.GROUP_SUBJECTS, preprocess_type=PreprocessType.ACTIVATIONS)
+    dataloader.preprocess(flow_type=FlowType.GROUP_SUBJECTS, preprocess_type=PreprocessType.DISTANCES)
     # dataloader.preprocess(flow_type=FlowType.SINGLE_SUBJECT, preprocess_type=PreprocessType.ACTIVATIONS)

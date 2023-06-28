@@ -43,9 +43,6 @@ def _preprocess(data: pd.DataFrame, preprocess_type: PreprocessType):
                 if preprocess_type.DISTANCES:
                     features = _distances_preprocess_util(features)
 
-                # Nothing special needs to be done when data type is activations.
-                elif preprocess_type.ACTIVATIONS:
-                    pass
 
                 data = {'subject': subject, 'mode': mode, 'y': [movie_name]}
                 for i, feature in enumerate(features):
@@ -80,3 +77,37 @@ def preprocess_dataset(roi: str, dataset: str, mode: Mode, preprocess_type: Prep
     preprocess_data = _preprocess(data, preprocess_type=preprocess_type)
     preprocess_data_mode = preprocess_data[preprocess_data['mode'] == mode.value.lower()]
     return preprocess_data_mode
+
+
+def dissimilarity_preprocessing(movie_df: pd.DataFrame, rest_df: pd.DataFrame):
+    # Filter the movie_df to include only the 5 groups for the training set
+    train_df = movie_df[movie_df['group'].isin(range(1, 6))].reset_index(drop=True)
+    train_df_labels = train_df['y'].values
+    train_df = train_df.drop(['group', 'y'], axis=1)
+
+    # Filter the rest_df to include only the samples from group 6
+    # Create an empty DataFrame for the test set
+
+    test_sample_movies = movie_df[movie_df['group'] == 6].drop(['group'], axis=1)
+    test_sample_movies = test_sample_movies.drop(['y'], axis=1)
+
+    test_df = rest_df[rest_df['group'] == 6].reset_index(drop=True)
+    test_df_labels = test_df['y'].values
+    test_df = test_df.drop(['group', 'y'], axis=1)
+
+    # Perform correlation between test samples and train samples in group 6
+    test_set = {}
+    test_set_df = pd.DataFrame()
+
+    for rest_i in range(len(test_df)):
+        for movie_i in range(len(test_sample_movies)):
+            feature_df = pd.DataFrame(
+                {'rest_test': test_df.iloc[rest_i], 'movie_test': test_sample_movies.iloc[movie_i]}).corr()
+
+            feature = 1 - feature_df.loc['rest_test'].at['movie_test']
+            test_set[movie_i] = [feature]
+
+        test_set_df = pd.concat([test_set_df, pd.DataFrame(test_set)])
+
+    test_set_df = test_set_df.reset_index(drop=True)
+    return train_df, train_df_labels, test_set_df, test_df_labels

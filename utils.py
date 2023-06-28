@@ -1,4 +1,5 @@
 import os
+import pickle
 
 import pandas as pd
 import scipy.io
@@ -59,5 +60,24 @@ def convert_pkl_to_mat(mode: Mode, roi: list[str]):
     scipy.io.savemat(mat_file_path, data_dict)
 
 
+def convert_pkl_to_hdf5(mode: Mode, roi: list[str]):
+    raw_data_mat = {}
+    raw_data_path = config.SUBNET_DATA_DF_DENORMALIZED.format(mode=mode.value)
+    subjects = os.listdir(raw_data_path)
+
+    for subject in subjects:
+        raw_data_mat[subject] = {}
+        for r in roi:
+            subjects_roi_path = os.path.join(raw_data_path, subject, f"{r}.pkl")
+            raw_data_mat[subject][r] = pd.read_pickle(subjects_roi_path)
+
+    # Save the dictionary to a pkl file
+    with open(f'176_subjects_3_flat_dynamic_roi{mode.name}.pkl', 'wb') as f:
+        pickle.dump(raw_data_mat, f)
+
+
+
 if __name__ == '__main__':
-    pass
+
+    convert_pkl_to_hdf5(Mode.REST, roi=['RH_Default_pCunPCC_4', 'LH_DorsAttn_Post_1', 'RH_Vis_16'])
+    convert_pkl_to_hdf5(Mode.TASK, roi=['RH_Default_pCunPCC_4', 'LH_DorsAttn_Post_1', 'RH_Vis_16'])
