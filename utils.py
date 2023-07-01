@@ -72,12 +72,13 @@ def convert_pkl_to_hdf5(mode: Mode, roi: list[str]):
             raw_data_mat[subject][r] = pd.read_pickle(subjects_roi_path)
 
     # Save the dictionary to a pkl file
-    with open(f'176_subjects_3_flat_dynamic_roi{mode.name}.pkl', 'wb') as f:
+    with open(f'176_subjects_3_roi_{mode.name.lower()}.pkl', 'wb') as f:
         pickle.dump(raw_data_mat, f)
 
 
 
 if __name__ == '__main__':
 
-    convert_pkl_to_hdf5(Mode.REST, roi=['RH_Default_pCunPCC_4', 'LH_DorsAttn_Post_1', 'RH_Vis_16'])
-    convert_pkl_to_hdf5(Mode.TASK, roi=['RH_Default_pCunPCC_4', 'LH_DorsAttn_Post_1', 'RH_Vis_16'])
+    convert_pkl_to_hdf5(Mode.FIRST_REST_SECTION, roi=['RH_Default_pCunPCC_1', 'RH_DorsAttn_Post_2', 'RH_Vis_18'])
+
+

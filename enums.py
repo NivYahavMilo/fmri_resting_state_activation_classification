@@ -4,6 +4,7 @@ from enum import Enum
 class Mode(Enum):
     REST = 'REST'
     TASK = 'TASK'
+    FIRST_REST_SECTION = 'FIRST_REST_SECTION'
 
 
 class PreprocessType(Enum):
