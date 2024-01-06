@@ -7,7 +7,7 @@ from scipy.stats import zscore
 
 import config
 from enums import Mode, PreprocessType, FlowType
-from utils import get_clip_index_mapping
+from utilities import get_clip_index_mapping
 
 
 class DataLoader:
@@ -34,7 +34,7 @@ class DataLoader:
         Returns:
             pd.DataFrame: Activations data for the specified ROI and subject.
         """
-        data_mode = config.SUBNET_DATA_DF.format(mode=mode.value)
+        data_mode = config.SUBNET_DATA_DF_DENORMALIZED.format(mode=mode.value)
         data_path = os.path.join(data_mode, subject, f'{roi}.pkl')
         data_df = pd.read_pickle(data_path)
         return data_df
