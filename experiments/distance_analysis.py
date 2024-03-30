@@ -3,8 +3,7 @@ import os.path
 import pandas as pd
 
 import config
-from experiments.preprocess_utils import _preprocess
-from enums import PreprocessType
+
 
 def compare_groups_rest_pattern():
     group_data_path = os.path.join(config.RAW_DATASETS_PATH,
