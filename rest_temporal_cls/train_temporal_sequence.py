@@ -56,8 +56,8 @@ def evaluate_rest_windows(
 
     rois_results = {}
     subjects_group = Utils.subject_list
-    k_window_size = kwargs.get('k_window_size') or 5
-    n_timepoints = kwargs.get('n_timepoints') or 18
+    k_window_size = kwargs.get('k_window_size', 5)
+    n_timepoints = kwargs.get('n_timepoints', 18)
     for roi in rois:
         # Skip processed ROI.
         if loaded_data.get(roi) and checkpoint:
@@ -70,20 +70,25 @@ def evaluate_rest_windows(
             total_scores = []
             window_as_str = f'{window_s}-{window_e}'
             print(f"Training window: {window_as_str}")
-            split_group = [*range(len(data))] if group_average else subjects_group
+            if group_average or kwargs['group_mean_correlation']:
+                split_group = [*range(len(data))]
+            else:
+                split_group = subjects_group
+
             for train_index, test_index in tqdm(validation_split.split(split_group)):
                 train_group = [split_group[i] for i in train_index]
                 test_group = [split_group[i] for i in test_index]
 
                 train_data = create_subject_group_dataset(
-                    data, window_range=(window_s, window_e), subjects_group=train_group, distances=distances
+                    data, window_range=(window_s, window_e), subjects_group=train_group, distances=distances,
+                    correlation_mean=kwargs['group_mean_correlation']
                 )
                 test_data = create_subject_group_dataset(
-                    data, window_range=(window_s, window_e), subjects_group=test_group, distances=distances
+                    data, window_range=(window_s, window_e), subjects_group=test_group, distances=distances,
+                    correlation_mean=kwargs['group_mean_correlation']
                 )
-
-                model = train_window_k(train_data)
-                score = evaluate_window_k(model, test_data)
+                model = train_window_k(dataset_df=train_data, shuffle=False)
+                score = evaluate_window_k(model=model, dataset_df=test_data, shuffle=False)
                 total_scores.append(score)
 
             np_scores = np.array(total_scores)
@@ -102,7 +107,8 @@ def evaluate_rest_windows(
         pickle.dump(rois_results, file)
 
 
-def create_subject_group_dataset(data, window_range: Tuple[int, int], subjects_group: List, distances: bool = False):
+def create_subject_group_dataset(data, window_range: Tuple[int, int], subjects_group: List, distances: bool,
+                                 correlation_mean: bool):
     """
     Creates a dataset for machine learning from temporal rest window activations.
 
@@ -121,13 +127,20 @@ def create_subject_group_dataset(data, window_range: Tuple[int, int], subjects_g
     for subject in subjects_group:
         subject_data = data.get(int(subject))
         subject_df = pd.DataFrame()
-        for rest_i in subject_data:
-            movie_features = subject_data.get(rest_i).get(f'{w_s}-{w_e}')
-            movie_df = pd.DataFrame(movie_features).transpose()
-            movie_df['y'] = rest_i
-            subject_df = pd.concat([subject_df, movie_df])
+        if correlation_mean:
+            dist_seq = subject_data[f'{w_s}-{w_e}']
+            dist_seq_df = pd.DataFrame(dist_seq)
+            dist_seq_df['y'] = [*range(1, 15)]
+            subject_df = dist_seq_df
 
-        if distances:
+        else:
+            for rest_i in subject_data:
+                movie_features = subject_data.get(rest_i).get(f'{w_s}-{w_e}')
+                movie_df = pd.DataFrame(movie_features).transpose()
+                movie_df['y'] = rest_i
+                subject_df = pd.concat([subject_df, movie_df])
+
+        if distances and not correlation_mean:
             subject_df_copy = subject_df.copy()
             subject_df_copy = subject_df_copy.drop('y', axis=1)
             subject_df_copy = subject_df_copy.transpose()
@@ -140,7 +153,7 @@ def create_subject_group_dataset(data, window_range: Tuple[int, int], subjects_g
     return dataset_df
 
 
-def train_window_k(dataset_df):
+def train_window_k(dataset_df: pd.DataFrame, shuffle: bool):
     """
     Trains a machine learning model on a given dataset.
 
@@ -150,7 +163,9 @@ def train_window_k(dataset_df):
     Returns:
     - Trained machine learning model.
     """
-    dataset_df = dataset_df.sample(frac=1).reset_index(drop=True)
+    if shuffle:
+        dataset_df = dataset_df.sample(frac=1).reset_index(drop=True)
+
     y_train = dataset_df['y'].values
     x_train = dataset_df.drop(['y'], axis=1).values
 
@@ -160,7 +175,7 @@ def train_window_k(dataset_df):
     return model
 
 
-def evaluate_window_k(model, test_data):
+def evaluate_window_k(model: LinearSVC, dataset_df: pd.DataFrame, shuffle: bool):
     """
     Evaluates the performance of a machine learning model on a test dataset.
 
@@ -171,7 +186,9 @@ def evaluate_window_k(model, test_data):
     Returns:
     - Accuracy score on the test dataset.
     """
-    dataset_df = test_data.sample(frac=1).reset_index(drop=True)
+    if shuffle:
+        dataset_df = dataset_df.sample(frac=1).reset_index(drop=True)
+
     y_test = dataset_df['y'].values
     x_test = dataset_df.drop(['y'], axis=1).values
     score = model.score(x_test, y_test)
@@ -204,11 +221,11 @@ def plot_window_score(roi, window_score):
 
 def train_k_fold_mat_file():
     # Load the .mat file
-    mat_data = scipy.io.loadmat('rest_act_all_win.mat')
+    mat_data = scipy.io.loadmat('rest_dist_all_win_new_all.mat')
     labels = scipy.io.loadmat('task_label.mat')
 
     # Extract the 3D tensor
-    x = mat_data['rest_act_all_win']
+    x = mat_data['rest_dist_all_win_new_all']
     y = labels['task_label']
 
     llo = LeaveOneOut()
@@ -243,8 +260,8 @@ def train_k_fold_mat_file():
 
             df_train = df[df['group'].isin(train_group)]
             df_test = df[df['group'].isin(test_group)]
-            model = train_window_k(dataset_df=df_train)
-            score = evaluate_window_k(model, df_test)
+            model = train_window_k(dataset_df=df_train, shuffle=False)
+            score = evaluate_window_k(model=model, dataset_df=df_test, shuffle=False)
             total_scores.append(score)
 
         np_scores = np.array(total_scores)
@@ -255,37 +272,42 @@ def train_k_fold_mat_file():
         window_score[window_as_str]['std'] = std_score
         print(f'Overall Average Score for window: {window_as_str}', avg_score)
 
-    Utils.plot_roi_temporal_windows_dynamic(window_score, mode='activations', roi='Dorsal Attention')
+    Utils.plot_roi_temporal_windows_dynamic(window_score, mode='distances', roi='Dorsal Attention')
 
 
 if __name__ == '__main__':
-    #train_k_fold_mat_file()
+    # train_k_fold_mat_file()
 
-    #
-    rois_to_evaluate = ['RH_DorsAttn_Post_2']
+    rois_to_evaluate = ['RH_DorsAttn_Post_2', 'RH_Default_pCunPCC_1', 'RH_Vis_18']
+
     evaluate_rest_windows(
         distances=False,
         rois=rois_to_evaluate,
         checkpoint=False,
         validation="llo",
         group_average=True,
-        k_subjects_in_group=17,
+        group_mean_correlation=False,
+        k_subjects_in_group=10,
         k_window_size=5,
-        k_split=10,
+        k_split=17,
         n_timepoints=18,
-        output_name='rois_activations_results_avg.pkl'
+        window_preprocess_method="mean",  # mean or flattening
+        output_name='all_rois_distances_results_avg.pkl'
+
     )
-    #
-    # evaluate_rest_windows(
-    #     distances=True,
-    #     rois=rois_to_evaluate,
-    #     checkpoint=False,
-    #     validation="llo",
-    #     group_average=True,
-    #     k_subjects_in_group=10,
-    #     k_window_size=5,
-    #     k_split=17,
-    #     n_timepoints=19,
-    #     output_name='rois_distances_results_avg.pkl'
-    #
-    # )
+
+    evaluate_rest_windows(
+        distances=True,
+        rois=rois_to_evaluate,
+        checkpoint=False,
+        validation="llo",
+        group_average=True,
+        group_mean_correlation=True,
+        k_subjects_in_group=10,
+        k_window_size=5,
+        k_split=17,
+        n_timepoints=18,
+        window_preprocess_method="mean",  # mean or flattening
+        output_name='all_rois_distances_results_avg.pkl'
+
+    )

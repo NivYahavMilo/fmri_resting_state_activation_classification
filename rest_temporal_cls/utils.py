@@ -43,6 +43,7 @@ class Utils:
 
         # Rotate x-axis labels for better readability
         plt.xticks(np.arange(len(windows_range)), windows_range, rotation=45)
+        #plt.ylim(0, 1)
 
         # Show the plot
         plt.show()

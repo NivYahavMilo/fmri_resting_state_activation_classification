@@ -48,7 +48,7 @@ def z_score_concatenated_scan(clip_sequence, rest_sequence):
     return concat_scans
 
 
-def get_normalized_data(roi: str, group_average: bool, first_rest: bool = False, **kwargs):
+def get_normalized_data(roi: str, first_rest: bool = False):
     data_loader = DataLoader()
     normalized_subjects_data = pd.DataFrame()
     subjects = Utils.subject_list
