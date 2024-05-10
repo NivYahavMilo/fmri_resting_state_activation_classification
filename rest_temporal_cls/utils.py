@@ -43,7 +43,7 @@ class Utils:
 
         # Rotate x-axis labels for better readability
         plt.xticks(np.arange(len(windows_range)), windows_range, rotation=45)
-        #plt.ylim(0, 1)
+        # plt.ylim(0, 1)
 
         # Show the plot
         plt.show()
@@ -55,42 +55,3 @@ def generate_windows_pair(k: int, n: int):
             yield i, i + k
 
 
-def plot_roi_temporal_windows_dynamic(results, **kwargs):
-    roi_list = kwargs.get('roi_list', [])
-    n_roi = len(roi_list)
-    for roi in roi_list:
-        roi_scores = results.get(roi)
-        n_windows = len(roi_scores)
-        for window, scores in roi_scores:
-            y = np.zeros(shape=(n_roi, len(n_windows)))
-        for group_index, dynamic_dict in results.items():
-            y[:, group_index - 1] = [*dynamic_dict.values()]
-            x_ticks = [*dynamic_dict.keys()]
-
-    y = np.nan_to_num(y)
-    mean_dynamic = y.mean(axis=1)
-    std_dynamic = y.std(axis=1, ddof=1) / np.sqrt(y.shape[1])
-
-    sns.set()
-    sns.set_theme(style="darkgrid")
-    fig = plt.gcf()
-    plt.plot(range(0, len(mean_dynamic)), mean_dynamic, linewidth=4, color='blue')
-
-    plt.fill_between(x=range(0, len(mean_dynamic)),
-                     y1=np.array(mean_dynamic) + np.array(std_dynamic),
-                     y2=np.array(mean_dynamic) - np.array(std_dynamic),
-                     facecolor='blue',
-                     alpha=0.2)
-
-    title = f"Mean of 6 groups dynamic over 29-30 average subjects\n ROI={kwargs.get('roi')}\nCLIP_WINDOW={kwargs.get('init_window').replace('dynamic', '')}TR"
-    plt.title(title)
-    plt.xticks(np.arange(len(x_ticks)), x_ticks, rotation=45)
-    plt.ylim([-.4, .9])
-    plt.xlabel('Rest TR window')
-    plt.ylabel('Correlation Value')
-    plt.legend([kwargs.get('analysis_mode').value, 'shuffle'])
-
-    plt.draw()
-    plt.show()
-    if not os.path.isfile(config.ROOT_PATH):
-        fig.savefig('image.png', dpi=300)

@@ -278,7 +278,8 @@ def train_k_fold_mat_file():
 if __name__ == '__main__':
     # train_k_fold_mat_file()
 
-    rois_to_evaluate = ['RH_DorsAttn_Post_2', 'RH_Default_pCunPCC_1', 'RH_Vis_18']
+    #rois_to_evaluate = ['RH_DorsAttn_Post_2', 'RH_Default_pCunPCC_1', 'RH_Vis_18']
+    rois_to_evaluate = Utils.roi_list
 
     evaluate_rest_windows(
         distances=False,
@@ -292,7 +293,7 @@ if __name__ == '__main__':
         k_split=17,
         n_timepoints=18,
         window_preprocess_method="mean",  # mean or flattening
-        output_name='all_rois_distances_results_avg.pkl'
+        output_name='all_rois_groups_activations_results.pkl'
 
     )
 
@@ -308,6 +309,6 @@ if __name__ == '__main__':
         k_split=17,
         n_timepoints=18,
         window_preprocess_method="mean",  # mean or flattening
-        output_name='all_rois_distances_results_avg.pkl'
+        output_name='all_rois_groups_distances_results.pkl'
 
     )

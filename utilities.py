@@ -98,6 +98,7 @@ def create_networks_level_pkl(mode):
     with open(f'176_subjects_7_networks_{mode.name.lower()}.pkl', 'wb') as f:
         pickle.dump(raw_data_mat, f)
 
+
 if __name__ == '__main__':
     create_roi_data_to_pkl(mode=Mode.FIRST_REST_SECTION, roi=[
         'RH_Default_Par_1', 'RH_Default_PFCdPFCm_9', 'LH_SalVentAttn_FrOperIns_1', 'RH_Default_PFCdPFCm_6',
@@ -107,5 +108,3 @@ if __name__ == '__main__':
     # create_networks_level_pkl(Mode.FIRST_REST_SECTION)
     # create_networks_level_pkl(Mode.REST)
     # create_networks_level_pkl(Mode.TASK)
-
-
