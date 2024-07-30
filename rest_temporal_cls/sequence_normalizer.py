@@ -53,14 +53,16 @@ def get_normalized_data(roi: str, first_rest: bool = False):
     normalized_subjects_data = pd.DataFrame()
     subjects = Utils.subject_list
     print("Normalizing Data")
-    for subject in tqdm(subjects):
+    subjects_copy = subjects.copy()
+    subjects_copy.remove('111312')
+    for subject in tqdm(subjects_copy):
         first_rest_sequence = pd.DataFrame()
         if first_rest:
             first_rest_sequence = data_loader.load_single_subject_activations(roi, subject, Mode.FIRST_REST_SECTION)
 
-        clip_sequence = data_loader.load_single_subject_activations(roi, subject, Mode.TASK)
+        clip_sequence = data_loader.load_single_subject_activations(roi, subject, Mode.RESTING_STATE_TASK)
         clip_sequence['is_rest'] = 0
-        rest_sequence = data_loader.load_single_subject_activations(roi, subject, Mode.REST)
+        rest_sequence = data_loader.load_single_subject_activations(roi, subject, Mode.RESTING_STATE_REST)
         rest_sequence['is_rest'] = 1
         norm_sub_data = z_score_concatenated_scan(clip_sequence, rest_sequence)
         normalized_subjects_data = pd.concat([normalized_subjects_data, norm_sub_data])

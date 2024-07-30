@@ -12,6 +12,7 @@ class StaticData:
     REST_ORDER: Optional[List]
     CLIP_MAPPING: Optional[Dict]
     SCAN_MAPPING: Optional[Dict]
+    ROI_TO_NETWORK_MAPPING: Optional[Dict]
 
     @classmethod
     def inhabit_class_members(cls):

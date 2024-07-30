@@ -27,6 +27,7 @@ def _get_mean_subjects_group(data, **kwargs):
             for timepoint in range(0, 19):
                 rest_seq_tr = rest_seq[rest_seq['timepoint'] == timepoint]
                 rest_seq_tr = rest_seq_tr.drop('timepoint', axis=1)
+                rest_seq_tr = rest_seq_tr.fillna(value=0)
                 rest_seq_tr_mean = rest_seq_tr.values.mean(axis=0)
                 rest_seq_mean_array.append(rest_seq_tr_mean)
 

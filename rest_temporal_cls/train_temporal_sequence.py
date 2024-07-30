@@ -1,23 +1,31 @@
 import os.path
-import pickle
-from typing import Tuple, List, Literal
+from typing import Tuple
 
-import numpy as np
 import pandas as pd
 import scipy
 from matplotlib import pyplot as plt
-from sklearn.model_selection import KFold, LeaveOneOut
+from sklearn.exceptions import ConvergenceWarning
 from sklearn.svm import LinearSVC
-from tqdm import tqdm
 
 from rest_temporal_cls.preprocess_temporal_rest import get_temporal_rest_window_activations
 from rest_temporal_cls.utils import generate_windows_pair, Utils
 
 accumulated_scores = {}
+import warnings
+
+# Suppress convergence warnings
+warnings.filterwarnings("ignore", category=ConvergenceWarning)
+
+import os
+import pickle
+from typing import List, Literal
+from tqdm import tqdm
+import numpy as np
+from sklearn.model_selection import KFold, LeaveOneOut
 
 
 def evaluate_rest_windows(
-        rois: list,
+        rois: List[str],
         distances: bool,
         checkpoint: bool,
         validation: Literal["k_fold", "llo"],
@@ -38,39 +46,38 @@ def evaluate_rest_windows(
     Returns:
     - None
     """
-    file_output_name = kwargs.get('output_name')
+    file_output_name = kwargs.get('output_name', 'rois_results.pkl')
     loaded_data = {}
-    if os.path.isfile(file_output_name):
+    if checkpoint and os.path.isfile(file_output_name):
         with open(file_output_name, 'rb') as output_file_io:
             loaded_data = pickle.load(output_file_io)
 
     if validation == 'k_fold':
         validation_k_split = kwargs.get('k_split', 8)
         validation_split = KFold(n_splits=validation_k_split, shuffle=True, random_state=42)
-
     elif validation == 'llo':
         validation_split = LeaveOneOut()
-
     else:
-        raise NotImplementedError(f"Validation method must be one of the following: {validation.__annotations__}")
+        raise NotImplementedError(f"Validation method must be one of the following: {validation}")
 
     rois_results = {}
     subjects_group = Utils.subject_list
     k_window_size = kwargs.get('k_window_size', 5)
     n_timepoints = kwargs.get('n_timepoints', 18)
-    for roi in rois:
-        # Skip processed ROI.
+    for roi in tqdm(rois):
+        # Skip processed ROI if checkpointing is enabled and data is loaded from the file.
         if loaded_data.get(roi) and checkpoint:
             rois_results[roi] = loaded_data.pop(roi)
             continue
 
+        print(f"Training ROI: {roi}")
         window_score = {}
         data = get_temporal_rest_window_activations(roi=roi, group_average=group_average, **kwargs)
         for window_s, window_e in generate_windows_pair(k=k_window_size, n=n_timepoints):
             total_scores = []
             window_as_str = f'{window_s}-{window_e}'
             print(f"Training window: {window_as_str}")
-            if group_average or kwargs['group_mean_correlation']:
+            if group_average or kwargs.get('group_mean_correlation'):
                 split_group = [*range(len(data))]
             else:
                 split_group = subjects_group
@@ -81,11 +88,11 @@ def evaluate_rest_windows(
 
                 train_data = create_subject_group_dataset(
                     data, window_range=(window_s, window_e), subjects_group=train_group, distances=distances,
-                    correlation_mean=kwargs['group_mean_correlation']
+                    correlation_mean=kwargs.get('group_mean_correlation')
                 )
                 test_data = create_subject_group_dataset(
                     data, window_range=(window_s, window_e), subjects_group=test_group, distances=distances,
-                    correlation_mean=kwargs['group_mean_correlation']
+                    correlation_mean=kwargs.get('group_mean_correlation')
                 )
                 model = train_window_k(dataset_df=train_data, shuffle=False)
                 score = evaluate_window_k(model=model, dataset_df=test_data, shuffle=False)
@@ -94,17 +101,16 @@ def evaluate_rest_windows(
             np_scores = np.array(total_scores)
             avg_score = np.mean(np_scores)
             std_score = np.std(np_scores, ddof=1) / np.sqrt(len(subjects_group))
-            window_score[window_as_str] = {}
-            window_score[window_as_str]['avg'] = avg_score
-            window_score[window_as_str]['std'] = std_score
+            window_score[window_as_str] = {'avg': avg_score, 'std': std_score}
             print(f'Overall Average Score for window: {window_as_str}', avg_score)
 
         rois_results[roi] = window_score
 
-    Utils.plot_roi_temporal_windows_dynamic(rois_results, mode='distances' if distances else 'activations')
+        if checkpoint:
+            with open(file_output_name, 'wb') as file:
+                pickle.dump(rois_results, file)
 
-    with open(file_output_name, 'wb') as file:
-        pickle.dump(rois_results, file)
+    # Utils.plot_roi_temporal_windows_dynamic(rois_results, mode='distances' if distances else 'activations')
 
 
 def create_subject_group_dataset(data, window_range: Tuple[int, int], subjects_group: List, distances: bool,
@@ -272,19 +278,19 @@ def train_k_fold_mat_file():
         window_score[window_as_str]['std'] = std_score
         print(f'Overall Average Score for window: {window_as_str}', avg_score)
 
-    Utils.plot_roi_temporal_windows_dynamic(window_score, mode='distances', roi='Dorsal Attention')
+    #   Utils.plot_roi_temporal_windows_dynamic(window_score, mode='distances', roi='Dorsal Attention')
 
 
 if __name__ == '__main__':
     # train_k_fold_mat_file()
 
-    #rois_to_evaluate = ['RH_DorsAttn_Post_2', 'RH_Default_pCunPCC_1', 'RH_Vis_18']
+    # rois_to_evaluate = ['RH_DorsAttn_Post_2', 'RH_Default_pCunPCC_1', 'RH_Vis_18']
     rois_to_evaluate = Utils.roi_list
 
     evaluate_rest_windows(
         distances=False,
         rois=rois_to_evaluate,
-        checkpoint=False,
+        checkpoint=True,
         validation="llo",
         group_average=True,
         group_mean_correlation=False,
@@ -293,22 +299,22 @@ if __name__ == '__main__':
         k_split=17,
         n_timepoints=18,
         window_preprocess_method="mean",  # mean or flattening
-        output_name='all_rois_groups_activations_results.pkl'
+        output_name='all_rois_groups_activations_results_resting_state.pkl'
 
     )
 
     evaluate_rest_windows(
         distances=True,
         rois=rois_to_evaluate,
-        checkpoint=False,
+        checkpoint=True,
         validation="llo",
-        group_average=True,
+        group_average=False,
         group_mean_correlation=True,
         k_subjects_in_group=10,
         k_window_size=5,
         k_split=17,
         n_timepoints=18,
         window_preprocess_method="mean",  # mean or flattening
-        output_name='all_rois_groups_distances_results.pkl'
+        output_name='all_rois_groups_distances_results_resting_state.pkl'
 
     )

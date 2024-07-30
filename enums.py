@@ -2,6 +2,8 @@ from enum import Enum
 
 
 class Mode(Enum):
+    RESTING_STATE_TASK = 'RESTING_STATE_TASK'
+    RESTING_STATE_REST = 'RESTING_STATE_REST'
     REST = 'REST'
     TASK = 'TASK'
     FIRST_REST_SECTION = 'FIRST_REST_SECTION'
