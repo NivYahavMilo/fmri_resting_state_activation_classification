@@ -2,8 +2,8 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-from rest_temporal_cls.sequence_normalizer import get_normalized_data
-from rest_temporal_cls.utils import generate_windows_pair
+from dataloader.sequence_normalizer import get_normalized_data
+from utils import generate_windows_pair
 
 
 def _get_mean_subjects_group(data, **kwargs):
@@ -11,7 +11,7 @@ def _get_mean_subjects_group(data, **kwargs):
     subject_ids_array = np.array(kwargs.get('subject_list'))
 
     # Use numpy.array_split to split the array into k groups
-    k_subs = kwargs.get('k_subjects_in_group')
+    k_subs = kwargs.get('k_split')
     subjects_group = np.array_split(subject_ids_array, k_subs)
 
     groups_data = {}
@@ -54,6 +54,7 @@ def get_temporal_rest_window_activations(roi: str, **kwargs):
     normalized_data = get_normalized_data(roi=roi)
     subjects = normalized_data['Subject'].unique()
     print("Preprocessing Data")
+
 
     if kwargs.get('group_average'):
         return _get_mean_subjects_group(normalized_data, subject_list=subjects, **kwargs)
@@ -106,7 +107,8 @@ def get_temporal_rest_window_activations(roi: str, **kwargs):
         for group_i, group in enumerate(subjects_group):
             groups_data[group_i] = {}
             for w_i, (window_start, window_end) in enumerate(generate_windows_pair(k=k_window_size, n=n_timepoints)):
-                group_seq_window_dist = np.mean([subjects_data[s][f'{window_start}-{window_end}'] for s in group], axis=0)
+                group_seq_window_dist = np.mean([subjects_data[s][f'{window_start}-{window_end}'] for s in group],
+                                                axis=0)
                 groups_data[group_i][f'{window_start}-{window_end}'] = group_seq_window_dist
 
         return groups_data

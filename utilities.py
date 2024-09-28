@@ -6,6 +6,9 @@ import scipy.io
 
 import config
 from enums import Mode
+from  static_data.static_data import StaticData
+
+StaticData.inhabit_class_members()
 
 
 def get_clip_index_mapping(inverse: bool = False):
@@ -74,7 +77,7 @@ def create_roi_data_to_pkl(mode: Mode, roi: list[str]):
             raw_data_mat[subject][r] = pd.read_pickle(subjects_roi_path)
 
     # Save the dictionary to a pkl file
-    with open(f'176_subjects_8_roi_{mode.name.lower()}.pkl', 'wb') as f:
+    with open(f'176_subjects_{len(roi)}_roi_{mode.name.lower()}.pkl', 'wb') as f:
         pickle.dump(raw_data_mat, f)
 
 
@@ -99,11 +102,55 @@ def create_networks_level_pkl(mode):
         pickle.dump(raw_data_mat, f)
 
 
+def save_activations_to_csv_pandas(roi_to_net_map, activation_results, csv_filename='activation_data.csv',
+                                   window=None, method='mean'):
+    # Create a list to hold the rows of data
+    data = []
+
+    # Loop through each ROI and network
+    for roi, network in roi_to_net_map.items():
+        roi_activations = activation_results.get(roi, {})
+
+        # Handle window-based data or aggregate method
+        if window is None:
+            if method == 'mean':
+                act_avg_values = [roi_activations[win]['avg'] for win in roi_activations]
+                activation_value = sum(act_avg_values) / len(act_avg_values)
+            else:
+                act_max_values = [roi_activations[win]['avg'] for win in roi_activations]
+                activation_value = max(act_max_values)
+        else:
+            activation_value = roi_activations.get(window, {}).get('avg', None)
+
+        # Add the data to the list if activation value is available
+        if activation_value is not None:
+            data.append([network, roi, activation_value])
+
+    # Convert the data into a pandas DataFrame
+    df = pd.DataFrame(data, columns=['Network', 'ROI', 'Activation Value'])
+    df = df.sort_values(by='Activation Value', ascending=False)
+
+    # Save the DataFrame to a CSV file
+    df.to_csv(csv_filename, index=False)
+
+    print(f"Data successfully saved to {csv_filename}")
+
 if __name__ == '__main__':
-    create_roi_data_to_pkl(mode=Mode.FIRST_REST_SECTION, roi=[
-        'RH_Default_Par_1', 'RH_Default_PFCdPFCm_9', 'LH_SalVentAttn_FrOperIns_1', 'RH_Default_PFCdPFCm_6',
-        'RH_Default_PFCv_3', 'RH_Default_Temp_6', 'RH_SalVentAttn_FrOperIns_1', 'RH_Limbic_TempPole_6'
-    ])
+    # activation_res = pd.read_pickle("all_rois_groups_activations_results.pkl")
+    # first_window = "0-5"
+    # save_activations_to_csv_pandas(roi_to_net_map=StaticData.ROI_TO_NETWORK_MAPPING,
+    #                                activation_results=activation_res,
+    #                                csv_filename=f'activation_data_window_{first_window}.csv',
+    #                             window=first_window)
+    # last_window = "13-18"
+    # save_activations_to_csv_pandas(roi_to_net_map=StaticData.ROI_TO_NETWORK_MAPPING,
+    #                                activation_results=activation_res,
+    #                                csv_filename=f'activation_data_window_{last_window}.csv',
+    #                             window=last_window)
+
+    create_roi_data_to_pkl(mode=Mode.TASK, roi=['RH_Vis_16', 'RH_Vis_5', 'LH_Vis_15' , 'RH_SomMot_2', 'LH_SomMot_3'])
+
+
 
     # create_networks_level_pkl(Mode.FIRST_REST_SECTION)
     # create_networks_level_pkl(Mode.REST)

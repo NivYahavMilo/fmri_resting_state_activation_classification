@@ -1,10 +1,80 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sns
 
 from static_data.static_data import StaticData
 
 StaticData.inhabit_class_members()
+
+
+def plot_sorted_activations_single_plot(roi_to_net_map, activation_results, window=None, method='mean'):
+    # Dictionary to hold activation values and corresponding networks
+    activation_data = []
+
+    # Populate the data for all ROIs
+    for roi, network in roi_to_net_map.items():
+        roi_activations = activation_results.get(roi, {})
+
+        # Handle window-based data or aggregate method
+        if window is None:
+            if method == 'mean':
+                act_avg_values = [roi_activations[win]['avg'] for win in roi_activations]
+                activation_value = sum(act_avg_values) / len(act_avg_values)
+            else:
+                act_max_values = [roi_activations[win]['avg'] for win in roi_activations]
+                activation_value = max(act_max_values)
+        elif window == 'last_tr_movie':
+            activation_value = roi_activations['avg']
+
+        else:
+            activation_value = roi_activations.get(window, {}).get('avg', None)
+
+        # Store only if activation data is available
+        if activation_value is not None:
+            activation_data.append((roi, activation_value, network))
+
+    # Sort the data by activation values (high to low)
+    activation_data.sort(key=lambda x: x[1], reverse=True)
+
+    # Extract the sorted ROI labels, activation values, and network assignments
+    sorted_rois = [item[0] for item in activation_data]
+    sorted_activation_values = [item[1] for item in activation_data]
+    sorted_networks = [item[2] for item in activation_data]
+
+    # Set up colors for the networks
+    networks = list(set(sorted_networks))
+    palette = sns.color_palette("hsv", len(networks))  # Create distinct colors
+    network_colors = {network: palette[i] for i, network in enumerate(networks)}
+
+    # Assign colors to each bar based on its network
+    bar_colors = [network_colors[net] for net in sorted_networks]
+
+    # Plot the sorted activations
+    fig, ax = plt.subplots(figsize=(20, 10))
+    x = np.arange(len(sorted_rois))
+
+    bars = ax.bar(x, sorted_activation_values, color=bar_colors)
+
+    # Add labels and title
+    ax.set_xlabel('ROIs', fontsize=15)
+    ax.set_ylabel('Activation Values', fontsize=15)
+    ax.set_title(f'Sorted Activation Values by ROI (Colored by Network) Window:{window}', fontsize=20)
+
+    # Set tick labels and rotation for clarity
+    #ax.set_xticks(x)
+    #ax.set_xticklabels(sorted_rois, rotation=90, fontsize=10)
+
+    # Create a custom legend for networks
+    legend_patches = [
+        plt.Line2D([0], [0], marker='o', color=network_colors[net], label=net, markersize=10, linestyle='')
+        for net in networks]
+    ax.legend(handles=legend_patches, title="Networks", fontsize=12, title_fontsize=14)
+
+    # Adjust layout and show the plot
+    fig.tight_layout()
+    fig.savefig(f'rois_strength_plt_{window}_window.png')
+    plt.show()
 
 
 def plot_roi_value(results, method=None, window=None):
@@ -53,7 +123,7 @@ def plot_roi_value(results, method=None, window=None):
         plt.title(title, fontsize=30)
         plt.xlabel('ROIs')
         plt.ylabel('Value')
-        plt.savefig(f"figures/distances/{title}.png")
+        # plt.savefig(f"figures/distances/{title}.png")
         plt.show()
 
 
@@ -143,7 +213,7 @@ def plot_combined_roi_value(activation_results, distance_results, method=None, w
         ax.tick_params(axis='y', labelsize=20)
 
         fig.tight_layout()
-        plt.savefig(f"figures/combined_resting_state/{title}.png")
+        # plt.savefig(f"figures/combined_resting_state/{title}.png")
         plt.show()
 
 
@@ -197,7 +267,8 @@ def plot_combined_roi_value_separate(activation_results, distance_results, metho
         for i, network in enumerate(networks):
             network_values = values[network]
             network_std_devs = std_devs[network]
-            bar = ax.bar(x, network_values, width, label=network, color=colors(i), yerr=network_std_devs, capsize=5, bottom=bottom)
+            bar = ax.bar(x, network_values, width, label=network, color=colors(i), yerr=network_std_devs, capsize=5,
+                         bottom=bottom)
             bottom += np.nan_to_num(network_values)
 
         ax.set_xlabel('ROIs', fontsize=30)
@@ -211,11 +282,12 @@ def plot_combined_roi_value_separate(activation_results, distance_results, metho
         ax.set_ylim(0, 1)
 
         fig.tight_layout()
-        plt.savefig(f"figures/distances/{filename}.png")
+        # plt.savefig(f"figures/distances/{filename}.png")
         plt.show()
 
     plot_values(activation_values, activation_std_devs, 'Activation Values by Network', 'activation_values')
     plot_values(distance_values, distance_std_devs, 'Distance Values by Network', 'distance_values')
+
 
 if __name__ == '__main__':
     # activation_res = pd.read_pickle("all_rois_groups_activations_results.pkl")
@@ -224,11 +296,13 @@ if __name__ == '__main__':
     # plot_combined_roi_value_separate(activation_res, distance_res, method="max")
     # plot_combined_roi_value_separate(activation_res, distance_res, window="13-18")
 
-    activation_res = pd.read_pickle("all_rois_groups_activations_results_resting_state.pkl")
-    distance_res = pd.read_pickle("all_rois_groups_distances_results_resting_state.pkl")
-    plot_combined_roi_value(activation_res, distance_res, window="13-18")
-    plot_combined_roi_value(activation_res, distance_res, method="mean")
-    plot_combined_roi_value(activation_res, distance_res, method="max")
+    activation_res = pd.read_pickle("all_rois_17_groups_10_sub_in_group_rest_between_data_5TR_window_activations_results.pkl")
+    # distance_res = pd.read_pickle("all_rois_groups_distances_results_resting_state.pkl")
+    plot_sorted_activations_single_plot(StaticData.ROI_TO_NETWORK_MAPPING, activation_res, window="13-18")
+    plot_sorted_activations_single_plot(StaticData.ROI_TO_NETWORK_MAPPING, activation_res, window="0-5")
+    activation_res = pd.read_pickle("all_rois_17_groups_10_sub_in_group_movie_data_last_5TR_activations_results.pkl")
+    plot_sorted_activations_single_plot(StaticData.ROI_TO_NETWORK_MAPPING, activation_res, window="last_tr_movie")
+
 
 #     # res = pd.read_pickle("all_rois_groups_activations_results.pkl")
 #     # plot_roi_value(res, method="mean")

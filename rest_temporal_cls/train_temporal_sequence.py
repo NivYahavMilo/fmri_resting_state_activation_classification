@@ -8,7 +8,7 @@ from sklearn.exceptions import ConvergenceWarning
 from sklearn.svm import LinearSVC
 
 from rest_temporal_cls.preprocess_temporal_rest import get_temporal_rest_window_activations
-from rest_temporal_cls.utils import generate_windows_pair, Utils
+from utils import generate_windows_pair, Utils
 
 accumulated_scores = {}
 import warnings
@@ -22,7 +22,6 @@ from typing import List, Literal
 from tqdm import tqdm
 import numpy as np
 from sklearn.model_selection import KFold, LeaveOneOut
-
 
 def evaluate_rest_windows(
         rois: List[str],
@@ -46,7 +45,7 @@ def evaluate_rest_windows(
     Returns:
     - None
     """
-    file_output_name = kwargs.get('output_name', 'rois_results.pkl')
+    file_output_name = kwargs.get('output_name')
     loaded_data = {}
     if checkpoint and os.path.isfile(file_output_name):
         with open(file_output_name, 'rb') as output_file_io:
@@ -62,8 +61,8 @@ def evaluate_rest_windows(
 
     rois_results = {}
     subjects_group = Utils.subject_list
-    k_window_size = kwargs.get('k_window_size', 5)
-    n_timepoints = kwargs.get('n_timepoints', 18)
+    k_window_size = kwargs.get('k_window_size')
+    n_timepoints = kwargs.get('n_timepoints')
     for roi in tqdm(rois):
         # Skip processed ROI if checkpointing is enabled and data is loaded from the file.
         if loaded_data.get(roi) and checkpoint:
@@ -280,41 +279,3 @@ def train_k_fold_mat_file():
 
     #   Utils.plot_roi_temporal_windows_dynamic(window_score, mode='distances', roi='Dorsal Attention')
 
-
-if __name__ == '__main__':
-    # train_k_fold_mat_file()
-
-    # rois_to_evaluate = ['RH_DorsAttn_Post_2', 'RH_Default_pCunPCC_1', 'RH_Vis_18']
-    rois_to_evaluate = Utils.roi_list
-
-    evaluate_rest_windows(
-        distances=False,
-        rois=rois_to_evaluate,
-        checkpoint=True,
-        validation="llo",
-        group_average=True,
-        group_mean_correlation=False,
-        k_subjects_in_group=10,
-        k_window_size=5,
-        k_split=17,
-        n_timepoints=18,
-        window_preprocess_method="mean",  # mean or flattening
-        output_name='all_rois_groups_activations_results_resting_state.pkl'
-
-    )
-
-    evaluate_rest_windows(
-        distances=True,
-        rois=rois_to_evaluate,
-        checkpoint=True,
-        validation="llo",
-        group_average=False,
-        group_mean_correlation=True,
-        k_subjects_in_group=10,
-        k_window_size=5,
-        k_split=17,
-        n_timepoints=18,
-        window_preprocess_method="mean",  # mean or flattening
-        output_name='all_rois_groups_distances_results_resting_state.pkl'
-
-    )

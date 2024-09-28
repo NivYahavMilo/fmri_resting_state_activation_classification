@@ -4,7 +4,7 @@ from tqdm import tqdm
 
 from dataloader.dataloader import DataLoader
 from enums import Mode
-from rest_temporal_cls.utils import Utils
+from utils import Utils
 
 
 def _z_score(seq: np.array, axis: int) -> np.array:
@@ -48,7 +48,7 @@ def z_score_concatenated_scan(clip_sequence, rest_sequence):
     return concat_scans
 
 
-def get_normalized_data(roi: str, first_rest: bool = False):
+def get_normalized_data(roi: str, first_rest: bool = False, resting_state: bool = False):
     data_loader = DataLoader()
     normalized_subjects_data = pd.DataFrame()
     subjects = Utils.subject_list
@@ -60,9 +60,11 @@ def get_normalized_data(roi: str, first_rest: bool = False):
         if first_rest:
             first_rest_sequence = data_loader.load_single_subject_activations(roi, subject, Mode.FIRST_REST_SECTION)
 
-        clip_sequence = data_loader.load_single_subject_activations(roi, subject, Mode.RESTING_STATE_TASK)
+        clip_sequence = data_loader.load_single_subject_activations(roi, subject,
+                                                                    Mode.TASK if not resting_state else Mode.RESTING_STATE_TASK)
         clip_sequence['is_rest'] = 0
-        rest_sequence = data_loader.load_single_subject_activations(roi, subject, Mode.RESTING_STATE_REST)
+        rest_sequence = data_loader.load_single_subject_activations(roi, subject,
+                                                                    Mode.REST if not resting_state else Mode.RESTING_STATE_REST)
         rest_sequence['is_rest'] = 1
         norm_sub_data = z_score_concatenated_scan(clip_sequence, rest_sequence)
         normalized_subjects_data = pd.concat([normalized_subjects_data, norm_sub_data])
