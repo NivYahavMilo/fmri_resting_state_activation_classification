@@ -6,7 +6,7 @@ import scipy.io
 
 import config
 from enums import Mode
-from  static_data.static_data import StaticData
+from static_data.static_data import StaticData
 
 StaticData.inhabit_class_members()
 
@@ -119,6 +119,9 @@ def save_activations_to_csv_pandas(roi_to_net_map, activation_results, csv_filen
             else:
                 act_max_values = [roi_activations[win]['avg'] for win in roi_activations]
                 activation_value = max(act_max_values)
+
+        elif window == "last_tr_movie":
+            activation_value = roi_activations["avg"]
         else:
             activation_value = roi_activations.get(window, {}).get('avg', None)
 
@@ -135,23 +138,23 @@ def save_activations_to_csv_pandas(roi_to_net_map, activation_results, csv_filen
 
     print(f"Data successfully saved to {csv_filename}")
 
+
 if __name__ == '__main__':
-    # activation_res = pd.read_pickle("all_rois_groups_activations_results.pkl")
-    # first_window = "0-5"
-    # save_activations_to_csv_pandas(roi_to_net_map=StaticData.ROI_TO_NETWORK_MAPPING,
-    #                                activation_results=activation_res,
-    #                                csv_filename=f'activation_data_window_{first_window}.csv',
-    #                             window=first_window)
-    # last_window = "13-18"
-    # save_activations_to_csv_pandas(roi_to_net_map=StaticData.ROI_TO_NETWORK_MAPPING,
-    #                                activation_results=activation_res,
-    #                                csv_filename=f'activation_data_window_{last_window}.csv',
-    #                             window=last_window)
+    activation_res = pd.read_pickle(
+        "svc_all_rois_17_groups_10_sub_in_group_rest_between_data_5TR_window_activations_results.pkl")
+    first_window = "0-5"
+    save_activations_to_csv_pandas(roi_to_net_map=StaticData.ROI_TO_NETWORK_MAPPING,
+                                   activation_results=activation_res,
+                                   csv_filename=f'activation_data_window_{first_window}.csv',
+                                   window=first_window)
+    last_window = "13-18"
+    save_activations_to_csv_pandas(roi_to_net_map=StaticData.ROI_TO_NETWORK_MAPPING,
+                                   activation_results=activation_res,
+                                   csv_filename=f'activation_data_window_{last_window}.csv',
+                                   window=last_window)
 
-    create_roi_data_to_pkl(mode=Mode.TASK, roi=['RH_Vis_16', 'RH_Vis_5', 'LH_Vis_15' , 'RH_SomMot_2', 'LH_SomMot_3'])
-
-
-
-    # create_networks_level_pkl(Mode.FIRST_REST_SECTION)
-    # create_networks_level_pkl(Mode.REST)
-    # create_networks_level_pkl(Mode.TASK)
+    activations_movie = pd.read_pickle(
+        "svc_all_rois_17_groups_10_sub_in_group_movie_data_last_5TR_activations_results.pkl")
+    save_activations_to_csv_pandas(roi_to_net_map=StaticData.ROI_TO_NETWORK_MAPPING,
+                                   activation_results=activations_movie,
+                                   csv_filename=f'activation_data_movie_last_5TR_window.csv', window="last_tr_movie")

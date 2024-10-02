@@ -3,7 +3,7 @@ import os
 from sklearn.metrics import classification_report
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
-from sklearn.svm import LinearSVC
+from sklearn.svm import SVC
 
 import config
 from enums import Mode, PreprocessType
@@ -34,7 +34,7 @@ def train():
 
     print('training on:', len(X_train), 'samples')
     # Train an SVM classifier on the training set
-    svm_classifier = LinearSVC()
+    svm_classifier = SVC()
     svm_classifier.fit(X_train, y_train)
 
     print('evaluating on:', len(X_test), 'samples')
@@ -59,7 +59,6 @@ def train():
     # Open the file in write mode and save the classification report
     with open(file_path, 'w') as file:
         file.write(f"Accuracy: {accuracy}\nClassification Report:\n {report}")
-
 
 
 if __name__ == '__main__':

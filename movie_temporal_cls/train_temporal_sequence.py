@@ -2,7 +2,7 @@ import os.path
 
 import pandas as pd
 from sklearn.exceptions import ConvergenceWarning
-from sklearn.svm import LinearSVC
+from sklearn.svm import SVC
 
 from movie_temporal_cls.process_temporal_movie import get_temporal_movie_window_activations
 from utils import Utils
@@ -92,9 +92,9 @@ def evaluate_movie_windows(
         std_score = np.std(np_scores, ddof=1) / np.sqrt(len(subjects_group))
         rois_results[roi] = {'avg': avg_score, 'std': std_score}
 
-    if checkpoint:
-        with open(file_output_name, 'wb') as file:
-            pickle.dump(rois_results, file)
+        if checkpoint:
+            with open(file_output_name, 'wb') as file:
+                pickle.dump(rois_results, file)
 
     # Utils.plot_roi_temporal_windows_dynamic(rois_results, mode='distances' if distances else 'activations')
 
@@ -140,13 +140,13 @@ def train_window_k(dataset_df: pd.DataFrame, shuffle: bool):
     y_train = dataset_df['y'].values
     x_train = dataset_df.drop(['y'], axis=1).values
 
-    model = LinearSVC()
+    model = SVC()
     model.fit(x_train, y_train)
 
     return model
 
 
-def evaluate_window_k(model: LinearSVC, dataset_df: pd.DataFrame, shuffle: bool):
+def evaluate_window_k(model: SVC, dataset_df: pd.DataFrame, shuffle: bool):
     """
     Evaluates the performance of a machine learning model on a test dataset.
 

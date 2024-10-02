@@ -3,10 +3,10 @@ from rest_temporal_cls.train_temporal_sequence import evaluate_rest_windows
 from static_data.static_data import StaticData
 
 
-def main():
-    #roi_list = ["RH_Default_PFCdPFCm_7"]
+def movie_window_decoding():
     StaticData.inhabit_class_members()
     roi_list = StaticData.ROI_NAMES
+    # roi_list = ["LH_DorsAttn_Post_2"]
 
     window_size = 5
     groups = 17
@@ -21,10 +21,19 @@ def main():
         k_split=groups,
         k_window_size=window_size,
         window_preprocess_method="mean",
-        output_name=f"all_rois_{groups}_groups_{subject_in_group}_sub_in_group_movie_data_last_{window_size}TR_activations_results.pkl"
+        output_name=f"svc_all_rois_{groups}_groups_{subject_in_group}_sub_in_group_movie_data_last_{window_size}TR_activations_results.pkl"
 
     )
 
+
+def rest_window_decoding():
+    StaticData.inhabit_class_members()
+    roi_list = StaticData.ROI_NAMES
+    # roi_list = ["LH_DorsAttn_Post_2"]
+
+    window_size = 5
+    groups = 17
+    subject_in_group = 10
     evaluate_rest_windows(
         distances=False,
         rois=roi_list,
@@ -37,9 +46,19 @@ def main():
         k_split=groups,
         n_timepoints=18,
         window_preprocess_method="mean",  # mean or flattening
-        output_name=f'all_rois_{groups}_groups_{subject_in_group}_sub_in_group_rest_between_data_{window_size}TR_window_activations_results.pkl'
+        output_name=f'svc_all_rois_{groups}_groups_{subject_in_group}_sub_in_group_rest_between_data_{window_size}TR_window_activations_results.pkl'
 
     )
+
+
+def movie_rest_correlation_activations():
+    pass
+
+def main():
+    rest_window_decoding()
+    movie_window_decoding()
+
+    movie_rest_correlation_activations()
 
 
 if __name__ == '__main__':

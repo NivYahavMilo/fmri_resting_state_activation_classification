@@ -5,7 +5,7 @@ import pandas as pd
 import scipy
 from matplotlib import pyplot as plt
 from sklearn.exceptions import ConvergenceWarning
-from sklearn.svm import LinearSVC
+from sklearn.svm import SVC
 
 from rest_temporal_cls.preprocess_temporal_rest import get_temporal_rest_window_activations
 from utils import generate_windows_pair, Utils
@@ -22,6 +22,7 @@ from typing import List, Literal
 from tqdm import tqdm
 import numpy as np
 from sklearn.model_selection import KFold, LeaveOneOut
+
 
 def evaluate_rest_windows(
         rois: List[str],
@@ -174,13 +175,13 @@ def train_window_k(dataset_df: pd.DataFrame, shuffle: bool):
     y_train = dataset_df['y'].values
     x_train = dataset_df.drop(['y'], axis=1).values
 
-    model = LinearSVC()
+    model = SVC()
     model.fit(x_train, y_train)
 
     return model
 
 
-def evaluate_window_k(model: LinearSVC, dataset_df: pd.DataFrame, shuffle: bool):
+def evaluate_window_k(model: SVC, dataset_df: pd.DataFrame, shuffle: bool):
     """
     Evaluates the performance of a machine learning model on a test dataset.
 
@@ -278,4 +279,3 @@ def train_k_fold_mat_file():
         print(f'Overall Average Score for window: {window_as_str}', avg_score)
 
     #   Utils.plot_roi_temporal_windows_dynamic(window_score, mode='distances', roi='Dorsal Attention')
-
