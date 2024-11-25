@@ -7,7 +7,7 @@ from botocore.exceptions import NoCredentialsError, ClientError
 s3_client = boto3.client('s3')
 
 
-def _file_exists(bucket_name, s3_path):
+def file_exists(bucket_name, s3_path):
     """
     Check if a file already exists in an S3 bucket.
 
@@ -47,7 +47,7 @@ def upload_folder_to_s3(local_folder, bucket_name, s3_folder=None):
                 for file in tqdm.tqdm(files_to_upload):
                     file_path = os.path.join(local_path, file)
                     s3_path = file_path if s3_folder is None else os.path.join(s3_folder, subject_folder, file)
-                    if _file_exists(bucket_name, s3_path):
+                    if file_exists(bucket_name, s3_path):
                         continue
                     # Upload the file to S3
                     s3_client.upload_file(file_path, bucket_name, s3_path)
@@ -65,10 +65,11 @@ if __name__ == '__main__':
 
     dirs_to_upload = [
         "Schaefer2018_SUBNET_TASK_DF_denormalized"
-        "Schaefer2018_SUBNET_FIRST_REST_SECTION_DF_denormalized",
-        "Schaefer2018_SUBNET_REST_DF_denormalized",
-        "Schaefer2018_SUBNET_RESTING_STATE_REST_DF_denormalized",
-        "Schaefer2018_SUBNET_RESTING_STATE_TASK_DF_denormalized",
+        # "Schaefer2018_SUBNET_FIRST_REST_SECTION_DF_denormalized",
+        # "Schaefer2018_SUBNET_REST_DF_denormalized",
+        # "Schaefer2018_SUBNET_RESTING_STATE_REST_DF_denormalized",
+        # "Schaefer2018_SUBNET_RESTING_STATE_TASK_DF_denormalized",
+        # "Schaefer2018_SUBNET_TASK_DF"
     ]
 
     for directory in dirs_to_upload:

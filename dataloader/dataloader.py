@@ -1,16 +1,22 @@
+import io
 import os
 import pickle
 from typing import Tuple
 
+import boto3
 import pandas as pd
 from scipy.stats import zscore
 
 import config
+from config import BUCKET_NAME
 from enums import Mode, PreprocessType, FlowType
 from utilities import get_clip_index_mapping
 
 
 class DataLoader:
+
+    def __init__(self):
+        self.s3_client = boto3.client('s3')
 
     def _group_subjects_load(self, roi: str, group_size: int, group_i: int, mode: Mode):
         data_mode = config.SUBNET_AVG_N_SUBJECTS.format(
@@ -34,10 +40,18 @@ class DataLoader:
         Returns:
             pd.DataFrame: Activations data for the specified ROI and subject.
         """
-        data_mode = config.SUBNET_DATA_DF_DENORMALIZED.format(mode=mode.value)
-        data_path = os.path.join(data_mode, subject, f'{roi}.pkl')
-        data_df = pd.read_pickle(data_path)
+        # Define the S3 bucket and file path
+        object_key = f"{config.S3_SUBNET_DATA_DF_DENORMALIZED.format(mode=mode.value)}/{subject}/{roi}.pkl"
+
+        # Download the file object from S3
+        response = self.s3_client.get_object(Bucket=BUCKET_NAME, Key=object_key)
+        file_content = response['Body'].read()
+
+        # Load the content into a pandas DataFrame
+        data_df = pd.read_pickle(io.BytesIO(file_content))
+
         return data_df
+
 
     def get_rest_subsequence_window(self, data: pd.DataFrame, rest_window: Tuple[int, int]) -> pd.DataFrame:
         """
@@ -169,7 +183,6 @@ class DataLoader:
             preprocess_data = self.group_subjects_flow(**preprocess_params)
 
         self.export_to_pkl(preprocess_data, flow_type, **preprocess_params)
-
 
     def group_subjects_flow(self, **preprocess_params):
         preprocess_data = {}

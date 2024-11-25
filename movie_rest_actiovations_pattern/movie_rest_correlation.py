@@ -12,18 +12,41 @@
 import pickle
 
 import boto3
+import matplotlib.pyplot as plt
 import numpy as np
 # Main function to execute the entire algorithm
 import pandas as pd
 import tqdm
 
+import aws_utils.upload_s3 as s3_utils
+from config import BUCKET_NAME
 from dataloader.sequence_normalizer import get_normalized_data
 from static_data.static_data import StaticData
 
 
+def get_group_average(group_list, data, feat_columns):
+    subjects_data = []
+    timepoints = []
+    movies = []
+    for sub in group_list:
+        subject_data = data[data['Subject'] == sub]
+        subject_data_feat = subject_data[feat_columns]
+        subjects_data.append(subject_data_feat)
+        timepoints = subject_data["timepoint"].values
+        movies = subject_data["y"].values
+
+    group_mean = pd.DataFrame(np.mean(subjects_data, axis=0))
+    group_mean.columns = feat_columns
+    group_mean["timepoint"] = timepoints
+    group_mean["y"] = movies
+
+    return group_mean
+
+
 def get_activations(data, n_groups=17, subjects_per_group=10):
     # Step 1: Identify feature columns
-    feature_columns = [col for col in data.columns if col not in ['y', 'timepoint', 'Subject', 'is_rest']]
+    non_features_column = ['y', 'timepoint', 'Subject', 'is_rest']
+    feature_columns = [col for col in data.columns if col not in non_features_column]
 
     # Step 2: Split dataset into groups of subjects
     unique_subjects = data['Subject'].unique()
@@ -38,11 +61,11 @@ def get_activations(data, n_groups=17, subjects_per_group=10):
 
         # Step 5: Process movie data (is_rest == 0)
         movie_data = group[group['is_rest'] == 0]
+        movie_data_mean = get_group_average(group_list=group_subjects, data=movie_data, feat_columns=feature_columns)
 
         # Step 6: Average features for the last 5 timepoints for each movie
         movie_vectors = []  # Initialize a list for movie average feature vectors
-
-        grouped_movies = movie_data.groupby('y')
+        grouped_movies = movie_data_mean.groupby('y')
         for movie_id, movie_group in grouped_movies:
             last_five_timepoints = movie_group.tail(5)[feature_columns]
             average_features = last_five_timepoints.mean()
@@ -54,36 +77,26 @@ def get_activations(data, n_groups=17, subjects_per_group=10):
 
         # Step 8: Process rest data (is_rest == 1) with sliding window of 5 timepoints
         rest_data = group[group['is_rest'] == 1]
-        rest_windows = []
+        rest_data_mean = get_group_average(group_list=group_subjects, data=rest_data, feat_columns=feature_columns)
 
         # Create 14 rest windows, averaging per subject for each window
         concatenated_rest_windows = []
         for i in range(14):
             # Select window data based on the current timepoint range
-            window_data = rest_data[rest_data["timepoint"].isin(range(i, i + 5))]
-
-            # Initialize a list for averaged features for this window
-            averaged_window = []
-
+            window_data = rest_data_mean[rest_data_mean["timepoint"].isin(range(i, i + 5))]
             # Average features per movie, per subject in this window
-            movie_averaged_features = []  # List to hold averaged features per movie
+            rest_averaged_features = []  # List to hold averaged features per movie
             for movie in window_data['y'].unique():
-                movie_data = window_data[window_data['y'] == movie]
-                movie_subject_means = []  # List to hold features for each subject for the current movie
+                rest_group_window = window_data[window_data['y'] == movie][feature_columns]
+                rest_group_window_avg = rest_group_window.mean()
+                rest_averaged_features.append(rest_group_window_avg)
 
-                for subject_id in movie_data['Subject'].unique():
-                    subject_features = movie_data[movie_data['Subject'] == subject_id][feature_columns]
-                    movie_subject_mean = subject_features.mean()  # Average features for this subject
-                    movie_subject_means.append(movie_subject_mean)
-
-                movie_mean = pd.DataFrame(movie_subject_means).mean()
-                movie_averaged_features.append(movie_mean)
-
-            concatenated_rest_windows.append(pd.DataFrame(movie_averaged_features).values.flatten())
+            concatenated_rest_windows.append(pd.DataFrame(rest_averaged_features).values.flatten())
 
         # Step 9: Compute correlations between concatenated movie vector and each concatenated rest window
         correlations = []
         for rest_window in concatenated_rest_windows:
+            # todo: make sure its pearson. debug RH_vis13 - LAST WINDOW -0.4
             corr = np.corrcoef(concatenated_movies, rest_window)[0, 1]  # Correlate
             correlations.append(corr)
 
@@ -92,18 +105,31 @@ def get_activations(data, n_groups=17, subjects_per_group=10):
 
         # Step 11: Compute the mean correlation across all groups
     mean_correlation_vector = np.mean(all_correlations, axis=0)
+    std_correlation_vector = np.std(all_correlations, axis=0, ddof=1) / (np.sqrt(n_groups) / 2)
 
-    return mean_correlation_vector
+    # _plot(mean_correlation_vector, std_correlation_vector)
+
+    return all_correlations, mean_correlation_vector, std_correlation_vector
 
 
-def get_movie_rest_activations(roi: str):
-    n_groups = 17
-    roi_norm = get_normalized_data(roi)
-    activations_vector = get_activations(data=roi_norm, subjects_per_group=10, n_groups=n_groups)
-    # Compute mean and standard deviation, dividing std by sqrt of the number of groups
-    mean_activations = np.mean(activations_vector)
-    std_activations = np.std(activations_vector, ddof=1) / np.sqrt(n_groups)
-    return activations_vector, mean_activations, std_activations
+def _plot(mean_vector, std_vector):
+    # Generate x-axis values
+    x = np.arange(len(mean_vector))
+
+    # Create the plot
+    plt.figure(figsize=(8, 5))
+    plt.errorbar(x, mean_vector, yerr=std_vector, fmt='-o', capsize=5, elinewidth=2,
+                 markeredgewidth=2)
+
+    # Add labels and title
+    plt.xlabel("X-Axis Label (e.g., Groups or Timepoints)")
+    plt.ylabel("Mean Correlation")
+    plt.title("Mean Correlation with Error Bars")
+    plt.grid(alpha=0.5)
+    plt.tight_layout()
+
+    # Show the plot
+    plt.show()
 
 
 def main():
@@ -113,13 +139,20 @@ def main():
     StaticData.inhabit_class_members()
     roi_list = StaticData.ROI_NAMES
     for roi in tqdm.tqdm(roi_list):
-        activations_vec, mean_vec, std_vec = get_movie_rest_activations(roi=roi)
+        s3_destination_path = f"Results/negative_correlation/{roi}.pkl"
+        if s3_utils.file_exists(bucket_name=BUCKET_NAME, s3_path=s3_destination_path):
+            continue
 
+        n_groups = 17
+        roi_norm = get_normalized_data(roi)
+        window_corr, mean_activations_vector, std_activation_vector = get_activations(
+            data=roi_norm, subjects_per_group=10, n_groups=n_groups
+        )
         # Combine the results into a dictionary
         results = {
-            'mean': mean_vec,
-            'std': std_vec,
-            'activations_vector': activations_vec
+            'mean': mean_activations_vector,
+            'std': std_activation_vector,
+            'activations_vector': window_corr
         }
 
         # Save the results to a pickle file
@@ -127,7 +160,6 @@ def main():
             pickle.dump(results, f)
 
         file_name = f'/Users/nivyahav/projects/fmri_resting_state_activation_classification/negative_correlation/{roi}.pkl'
-        s3_destination_path = f"Results/negative_correlation/{roi}.pkl"
         try:
             s3.upload_file(file_name, bucket_name, s3_destination_path)
             print(f"File {file_name} uploaded successfully to {s3_destination_path}")

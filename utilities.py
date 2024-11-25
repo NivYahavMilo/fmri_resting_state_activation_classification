@@ -1,8 +1,11 @@
+import io
 import os
 import pickle
 
+import boto3
 import pandas as pd
 import scipy.io
+import tqdm
 
 import config
 from enums import Mode
@@ -63,7 +66,7 @@ def convert_pkl_to_mat(mode: Mode, roi: list[str]):
     scipy.io.savemat(mat_file_path, data_dict)
 
 
-def create_roi_data_to_pkl(mode: Mode, roi: list[str]):
+def create_roi_data_to_pkl(mode: Mode, roi: list[str], sort_direction=""):
     raw_data_mat = {}
     raw_data_path = config.SUBNET_DATA_DF_DENORMALIZED.format(mode=mode.value)
 
@@ -77,7 +80,8 @@ def create_roi_data_to_pkl(mode: Mode, roi: list[str]):
             raw_data_mat[subject][r] = pd.read_pickle(subjects_roi_path)
 
     # Save the dictionary to a pkl file
-    with open(f'176_subjects_{len(roi)}_roi_{mode.name.lower()}.pkl', 'wb') as f:
+    file_name = f"{sort_direction}{len(subjects)}_subjects_{len(roi)}_roi_{mode.name.lower()}.pkl"
+    with open(file_name, 'wb') as f:
         pickle.dump(raw_data_mat, f)
 
 
@@ -139,22 +143,103 @@ def save_activations_to_csv_pandas(roi_to_net_map, activation_results, csv_filen
     print(f"Data successfully saved to {csv_filename}")
 
 
-if __name__ == '__main__':
-    activation_res = pd.read_pickle(
-        "svc_all_rois_17_groups_10_sub_in_group_rest_between_data_5TR_window_activations_results.pkl")
-    first_window = "0-5"
-    save_activations_to_csv_pandas(roi_to_net_map=StaticData.ROI_TO_NETWORK_MAPPING,
-                                   activation_results=activation_res,
-                                   csv_filename=f'activation_data_window_{first_window}.csv',
-                                   window=first_window)
-    last_window = "13-18"
-    save_activations_to_csv_pandas(roi_to_net_map=StaticData.ROI_TO_NETWORK_MAPPING,
-                                   activation_results=activation_res,
-                                   csv_filename=f'activation_data_window_{last_window}.csv',
-                                   window=last_window)
+def list_all_objects(client, bucket_name, prefix):
+    """
+    List all object keys under a given prefix in an S3 bucket, handling pagination.
 
-    activations_movie = pd.read_pickle(
-        "svc_all_rois_17_groups_10_sub_in_group_movie_data_last_5TR_activations_results.pkl")
-    save_activations_to_csv_pandas(roi_to_net_map=StaticData.ROI_TO_NETWORK_MAPPING,
-                                   activation_results=activations_movie,
-                                   csv_filename=f'activation_data_movie_last_5TR_window.csv', window="last_tr_movie")
+    Args:
+        bucket_name (str): Name of the S3 bucket.
+        prefix (str): Prefix to filter the objects.
+
+    Returns:
+        list[str]: A list of all object keys under the prefix.
+    """
+    keys = []
+    continuation_token = None
+
+    while True:
+        # List objects with pagination
+        list_kwargs = {'Bucket': bucket_name, 'Prefix': prefix}
+        if continuation_token:
+            list_kwargs['ContinuationToken'] = continuation_token
+
+        response = client.list_objects_v2(**list_kwargs)
+
+        # Extract keys from the current batch
+        keys.extend([content['Key'] for content in response.get('Contents', [])])
+
+        # Check if there are more keys to fetch
+        if response.get('IsTruncated'):  # True if more results are available
+            continuation_token = response['NextContinuationToken']
+        else:
+            break
+
+    return keys
+
+
+def create_roi_data_to_pkl_s3(mode: Mode, roi: list[str], sort_direction=""):
+    s3_client = boto3.client('s3')
+    bucket_name = "erezsimony"
+    # Define the base S3 path for the raw data
+    base_s3_path = f"Schaefer2018_SUBNET_{mode.name}_DF_denormalized"
+    # Dictionary to store the aggregated data
+    raw_data_mat = {}
+
+    # Get the list of subjects from the S3 bucket
+    try:
+
+        all_keys = list_all_objects(s3_client, bucket_name, base_s3_path)
+        subjects = list(set(key.split('/')[1] for key in all_keys if len(key.split('/')) == 3))
+        print(f"Found subjects: {subjects}")
+    except Exception as e:
+        print(f"Error listing objects in S3: {e}")
+        return
+
+    # Fetch and process data for each subject and ROI
+    for subject in tqdm.tqdm(subjects):
+        raw_data_mat[subject] = {}
+        for r in roi:
+            roi_s3_path = f"{base_s3_path}/{subject}/{r}.pkl"
+            try:
+                # Fetch the ROI data from S3
+                response = s3_client.get_object(Bucket=bucket_name, Key=roi_s3_path)
+                roi_data = pickle.load(io.BytesIO(response['Body'].read()))
+                raw_data_mat[subject][r] = roi_data
+                print(f"Processed ROI {r} for subject {subject} in mode {mode.name} sorted {sort_direction}")
+            except Exception as e:
+                print(f"Error fetching ROI data {roi_s3_path} from S3: {e}")
+
+    # Save the aggregated data to a .pkl file
+    file_name = f"{sort_direction}_{len(subjects)}_subjects_{len(roi)}_roi_{mode.name.lower()}.pkl"
+    with open(file_name, 'wb') as f:
+        pickle.dump(raw_data_mat, f)
+
+    # Upload the file to S3
+    s3_output_path = f"output_data/{file_name}"
+    try:
+        s3_client.upload_file(file_name, bucket_name, s3_output_path)
+        print(f"Aggregated data uploaded successfully to s3://{bucket_name}/{s3_output_path}")
+    except Exception as e:
+        print(f"Error uploading file to S3: {e}")
+
+
+if __name__ == '__main__':
+    StaticData.inhabit_class_members()
+    rois = StaticData.ROI_NAMES
+    with open("svc_all_rois_17_groups_10_sub_in_group_rest_between_data_5TR_window_activations_results.pkl", "rb") as f:
+        decoding_scores = pickle.load(f)
+
+    sorted_decoding_scores = sorted(decoding_scores.items(), key=lambda x: x[1]["13-18"]["avg"], reverse=True)
+    sorted_rois = [roi[0] for roi in sorted_decoding_scores]
+    highest_sorted_rois = sorted_rois[:10]
+    lowest_sorted_rois = sorted_rois[-10:]
+
+    #create_roi_data_to_pkl_s3(mode=Mode.REST, roi=highest_sorted_rois, sort_direction="highest_decding")
+    create_roi_data_to_pkl_s3(mode=Mode.REST, roi=lowest_sorted_rois, sort_direction="lowest_decding")
+
+    #create_roi_data_to_pkl_s3(mode=Mode.FIRST_REST_SECTION, roi=highest_sorted_rois, sort_direction="highest_decding")
+    create_roi_data_to_pkl_s3(mode=Mode.FIRST_REST_SECTION, roi=lowest_sorted_rois, sort_direction="lowest_decding")
+
+    #create_roi_data_to_pkl_s3(mode=Mode.TASK, roi=highest_sorted_rois, sort_direction="highest_decding")
+    create_roi_data_to_pkl_s3(mode=Mode.TASK, roi=lowest_sorted_rois, sort_direction="lowest_decding")
+
