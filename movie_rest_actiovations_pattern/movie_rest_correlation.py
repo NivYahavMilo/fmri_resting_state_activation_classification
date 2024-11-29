@@ -10,6 +10,7 @@
 # perform mean on 14 sized vector accros all groups.
 # plot line with the correlation values accross windows.
 import pickle
+from io import BytesIO
 
 import boto3
 import matplotlib.pyplot as plt
@@ -18,10 +19,10 @@ import numpy as np
 import pandas as pd
 import tqdm
 
-import aws_utils.upload_s3 as s3_utils
 from config import BUCKET_NAME
 from dataloader.sequence_normalizer import get_normalized_data
 from static_data.static_data import StaticData
+import aws_utils.upload_s3 as s3_utils
 
 
 def get_group_average(group_list, data, feat_columns):
@@ -72,7 +73,7 @@ def get_activations(data, n_groups=17, subjects_per_group=10):
             movie_vectors.append(average_features)
 
         # Convert to DataFrame and flatten
-        movie_vectors_df = pd.DataFrame(movie_vectors)
+        movie_vectors_df = pd.DataFrame(movie_vectors).fillna(0)
         concatenated_movies = movie_vectors_df.values.flatten()
 
         # Step 8: Process rest data (is_rest == 1) with sliding window of 5 timepoints
@@ -91,7 +92,9 @@ def get_activations(data, n_groups=17, subjects_per_group=10):
                 rest_group_window_avg = rest_group_window.mean()
                 rest_averaged_features.append(rest_group_window_avg)
 
-            concatenated_rest_windows.append(pd.DataFrame(rest_averaged_features).values.flatten())
+            concat_rest_windows = pd.DataFrame(rest_averaged_features).fillna(0)
+            concat_rest_windows = concat_rest_windows.values.flatten()
+            concatenated_rest_windows.append(concat_rest_windows)
 
         # Step 9: Compute correlations between concatenated movie vector and each concatenated rest window
         correlations = []
@@ -166,6 +169,56 @@ def main():
         except Exception as e:
             print(f"Failed to upload {file_name} to S3: {e}")
 
+def upload_csv_results():
+    """
+    Reads pickle files for each ROI from S3, extracts the mean value from the last window,
+    and uploads a single CSV file with all ROIs' last window mean results to S3.
+    """
+    s3 = boto3.client('s3')
+    bucket_name = BUCKET_NAME
+    output_csv_path = "Results/last_window_mean_results.csv"
+
+    StaticData.inhabit_class_members()
+    roi_list = StaticData.ROI_NAMES
+    # Initialize a list to collect all ROI results
+    last_window_results = []
+
+    for roi in tqdm.tqdm(roi_list):
+        s3_source_path = f"Results/negative_correlation/{roi}.pkl"
+
+        # Check if the pickle file exists in S3
+        if not s3_utils.file_exists(bucket_name=bucket_name, s3_path=s3_source_path):
+            print(f"File not found in S3: {s3_source_path}")
+            continue
+
+        # Download the pickle file
+        response = s3.get_object(Bucket=bucket_name, Key=s3_source_path)
+        results = pickle.load(BytesIO(response['Body'].read()))
+
+        # Extract the mean vector
+        if "activations_vector" not in results:
+            print(f"No mean vector found in {s3_source_path}")
+            continue
+
+        # Get the last value of the mean vector
+        last_window_mean = results['mean'][-1]
+        last_window_results.append({"ROI": roi, "value": last_window_mean})
+
+    # Convert the results into a DataFrame
+    df_results = pd.DataFrame(last_window_results).sort_values(by=['value'], ascending=False).reset_index(drop=True)
+
+    # Save the DataFrame to a local CSV file
+    local_csv_path = "last_window_mean_results.csv"
+    df_results.to_csv(local_csv_path, index=False)
+
+    # Upload the CSV to S3
+    try:
+        s3.upload_file(local_csv_path, bucket_name, output_csv_path)
+        print(f"CSV uploaded successfully to s3://{bucket_name}/{output_csv_path}")
+    except Exception as e:
+        print(f"Failed to upload CSV to S3: {e}")
+
 
 if __name__ == '__main__':
     main()
+    upload_csv_results()
