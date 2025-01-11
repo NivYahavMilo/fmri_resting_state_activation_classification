@@ -226,20 +226,38 @@ def create_roi_data_to_pkl_s3(mode: Mode, roi: list[str], sort_direction=""):
 if __name__ == '__main__':
     StaticData.inhabit_class_members()
     rois = StaticData.ROI_NAMES
-    with open("svc_all_rois_17_groups_10_sub_in_group_rest_between_data_5TR_window_activations_results.pkl", "rb") as f:
-        decoding_scores = pickle.load(f)
+    df = pd.read_csv("results/last_window_mean_results.csv")
+    # positive_corr_roi = df.iloc[:10]["ROI"].tolist()
+    rois = [
+    "RH_Vis_13",
+    "LH_Vis_14",
+    "RH_Default_Temp_5",
+    "RH_Default_PFCv_1",
+    "RH_SomMot_7",
+    "RH_Vis_7",
+    "RH_Default_pCunPCC_1",
+    "RH_Default_PFCv_3",
+    "LH_DorsAttn_Post_3",
+    "LH_DorsAttn_Post_5"
+]
+    create_roi_data_to_pkl_s3(Mode.TASK, roi=rois, sort_direction="10_lowest_negative_correlation")
+    create_roi_data_to_pkl_s3(Mode.REST, roi=rois, sort_direction="10_lowest_negative_correlation")
+    create_roi_data_to_pkl_s3(Mode.FIRST_REST_SECTION, roi=rois, sort_direction="10_lowest_negative_correlation")
 
-    sorted_decoding_scores = sorted(decoding_scores.items(), key=lambda x: x[1]["13-18"]["avg"], reverse=True)
-    sorted_rois = [roi[0] for roi in sorted_decoding_scores]
-    highest_sorted_rois = sorted_rois[:10]
-    lowest_sorted_rois = sorted_rois[-10:]
+    # with open("results/svc_all_rois_17_groups_10_sub_in_group_rest_between_data_5TR_window_activations_results.pkl", "rb") as f:
+    #     decoding_scores = pickle.load(f)
 
-    #create_roi_data_to_pkl_s3(mode=Mode.REST, roi=highest_sorted_rois, sort_direction="highest_decding")
-    create_roi_data_to_pkl_s3(mode=Mode.REST, roi=lowest_sorted_rois, sort_direction="lowest_decding")
-
-    #create_roi_data_to_pkl_s3(mode=Mode.FIRST_REST_SECTION, roi=highest_sorted_rois, sort_direction="highest_decding")
-    create_roi_data_to_pkl_s3(mode=Mode.FIRST_REST_SECTION, roi=lowest_sorted_rois, sort_direction="lowest_decding")
-
-    #create_roi_data_to_pkl_s3(mode=Mode.TASK, roi=highest_sorted_rois, sort_direction="highest_decding")
-    create_roi_data_to_pkl_s3(mode=Mode.TASK, roi=lowest_sorted_rois, sort_direction="lowest_decding")
+    # sorted_decoding_scores = sorted(decoding_scores.items(), key=lambda x: x[1]["13-18"]["avg"], reverse=True)
+    # sorted_rois = [roi[0] for roi in sorted_decoding_scores]
+    # highest_sorted_rois = sorted_rois[:10]
+    # lowest_sorted_rois = sorted_rois[-10:]
+    #
+    # #create_roi_data_to_pkl_s3(mode=Mode.REST, roi=highest_sorted_rois, sort_direction="highest_decding")
+    # create_roi_data_to_pkl_s3(mode=Mode.REST, roi=lowest_sorted_rois, sort_direction="lowest_decding")
+    #
+    # #create_roi_data_to_pkl_s3(mode=Mode.FIRST_REST_SECTION, roi=highest_sorted_rois, sort_direction="highest_decding")
+    # create_roi_data_to_pkl_s3(mode=Mode.FIRST_REST_SECTION, roi=lowest_sorted_rois, sort_direction="lowest_decding")
+    #
+    # #create_roi_data_to_pkl_s3(mode=Mode.TASK, roi=highest_sorted_rois, sort_direction="highest_decding")
+    # create_roi_data_to_pkl_s3(mode=Mode.TASK, roi=lowest_sorted_rois, sort_direction="lowest_decding")
 

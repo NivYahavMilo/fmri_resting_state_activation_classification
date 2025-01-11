@@ -1,3 +1,6 @@
+import concurrent.futures
+
+import boto3
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
@@ -49,24 +52,46 @@ def z_score_concatenated_scan(clip_sequence, rest_sequence):
 
 
 def get_normalized_data(roi: str, first_rest: bool = False, resting_state: bool = False):
-    data_loader = DataLoader()
+    data_loader = DataLoader()  # Assuming s3_client is initialized
     normalized_subjects_data = pd.DataFrame()
-    subjects = Utils.subject_list
-    print("Normalizing Data")
-    subjects_copy = subjects.copy()
-    subjects_copy.remove('111312')
-    for subject in tqdm(subjects_copy):
+    subjects = Utils.subject_list.copy()
+    subjects.remove('111312')
+
+    def process_subject(subject):
         first_rest_sequence = pd.DataFrame()
         if first_rest:
             first_rest_sequence = data_loader.load_single_subject_activations(roi, subject, Mode.FIRST_REST_SECTION)
 
-        clip_sequence = data_loader.load_single_subject_activations(roi, subject,
-                                                                    Mode.TASK if not resting_state else Mode.RESTING_STATE_TASK)
+        clip_sequence = data_loader.load_single_subject_activations(
+            roi, subject, Mode.TASK if not resting_state else Mode.RESTING_STATE_TASK
+        )
         clip_sequence['is_rest'] = 0
-        rest_sequence = data_loader.load_single_subject_activations(roi, subject,
-                                                                    Mode.REST if not resting_state else Mode.RESTING_STATE_REST)
+
+        rest_sequence = data_loader.load_single_subject_activations(
+            roi, subject, Mode.REST if not resting_state else Mode.RESTING_STATE_REST
+        )
         rest_sequence['is_rest'] = 1
+
         norm_sub_data = z_score_concatenated_scan(clip_sequence, rest_sequence)
-        normalized_subjects_data = pd.concat([normalized_subjects_data, norm_sub_data])
+        return norm_sub_data
+
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        futures = {executor.submit(process_subject, subject): subject for subject in subjects}
+        for future in tqdm(concurrent.futures.as_completed(futures), total=len(subjects)):
+            subject_data = future.result()
+            normalized_subjects_data = pd.concat([normalized_subjects_data, subject_data])
+
+    # Upload the CSV file to S3
+    s3 = boto3.client('s3')
+    bucket_name = 'erezsimony'
+    s3_destination_path = f'processed_rois{"_resting_state" if resting_state else ""}/{roi}.pkl'
+    normalized_subjects_data.to_pickle(s3_destination_path)
+
+    try:
+        s3.upload_file(s3_destination_path, bucket_name, s3_destination_path)
+        print(f"File {s3_destination_path} uploaded successfully to {s3_destination_path}")
+
+    except Exception as e:
+        print(f"Failed to upload {s3_destination_path} to S3: {e}")
 
     return normalized_subjects_data
