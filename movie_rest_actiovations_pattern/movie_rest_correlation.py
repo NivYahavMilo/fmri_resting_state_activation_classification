@@ -146,7 +146,6 @@ def process_roi(roi, s3, bucket_name, context_window: int, s3_destination: str, 
     n_groups = 17
 
     roi_norm = get_normalized_data(roi, resting_state=resting_state)
-    return
     window_corr, mean_activations_vector, std_activation_vector = get_activations(
         movie_context_window=context_window,
         data=roi_norm, subjects_per_group=10, n_groups=n_groups
@@ -237,4 +236,4 @@ def upload_csv_results():
 
 if __name__ == '__main__':
     main()
-    # upload_csv_results()
+    upload_csv_results()

@@ -1,10 +1,13 @@
 import concurrent.futures
+import os
 
 import boto3
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
+from aws_utils.fetch_s3 import fetch_object_from_s3
+from aws_utils.upload_s3 import s3_client
 from dataloader.dataloader import DataLoader
 from enums import Mode
 from utils import Utils
@@ -52,7 +55,18 @@ def z_score_concatenated_scan(clip_sequence, rest_sequence):
 
 
 def get_normalized_data(roi: str, first_rest: bool = False, resting_state: bool = False):
-    data_loader = DataLoader()  # Assuming s3_client is initialized
+    s3 = boto3.client('s3')
+    bucket_name = 'erezsimony'
+    s3_destination_path = f'processed_rois{"_resting_state" if resting_state else ""}/{roi}.pkl'
+    if os.path.exists(s3_destination_path):
+        print(f"Found {s3_destination_path} locally")
+        return pd.read_pickle(s3_destination_path)
+
+    normalized_subjects_data = fetch_object_from_s3(s3_client, bucket_name, s3_destination_path)
+    if normalized_subjects_data is not None:
+        return normalized_subjects_data
+
+    data_loader = DataLoader()
     normalized_subjects_data = pd.DataFrame()
     subjects = Utils.subject_list.copy()
     subjects.remove('111312')
@@ -81,10 +95,7 @@ def get_normalized_data(roi: str, first_rest: bool = False, resting_state: bool 
             subject_data = future.result()
             normalized_subjects_data = pd.concat([normalized_subjects_data, subject_data])
 
-    # Upload the CSV file to S3
-    s3 = boto3.client('s3')
-    bucket_name = 'erezsimony'
-    s3_destination_path = f'processed_rois{"_resting_state" if resting_state else ""}/{roi}.pkl'
+
     normalized_subjects_data.to_pickle(s3_destination_path)
 
     try:
