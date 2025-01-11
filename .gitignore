@@ -160,8 +160,9 @@ cython_debug/
 #.idea/
 
 results/
-.xml
+*.xml
 *.pkl
 *.nii
 *.ipynb
+*.iml
 
